@@ -7,9 +7,10 @@ The app does **not** include game data, fonts, translation workbooks, or keys. S
 ## Start
 
 1. Install Node.js and Python 3.
-2. From this folder, run `npm install` and `npm start`.
-3. In the app, open **Python environment → Set up Python packages**. This creates a private environment under the app's user data folder and installs Pillow, fontTools, openpyxl, and NumPy. You can instead choose an existing Python executable with those packages installed.
-4. Use **Workspace** to choose the folder holding your game assets. See **Source documentation** for the expected layout and translation workflow.
+2. Clone with the toolkit submodule: `git clone --recursive https://github.com/Foxiary/VE-ES-Desktop.git`. In an existing clone, run `git submodule update --init`.
+3. From this folder, run `npm install` and `npm start`.
+4. In the app, open **Python environment → Set up Python packages**. This creates a private environment under the app's user data folder and installs Pillow, fontTools, openpyxl, and NumPy. You can instead choose an existing Python executable with those packages installed.
+5. Use **Workspace** to choose the folder holding your game assets. See **Source documentation** for the expected layout and translation workflow.
 
 If npm blocks Electron's install script, run `npm approve-scripts electron` and `node node_modules/electron/install.js` once.
 
@@ -29,4 +30,4 @@ Each operation launches an original Python script with an argument array, withou
 
 On startup, the app updates scripts and configuration in an existing workspace only when they still match the previous bundled revision. User edited files are preserved. New files are added. Retired upstream scripts may remain in older workspaces but no longer appear in the tool catalog.
 
-Source snapshot: [Foxiary/VE-ES commit 019ccce](https://github.com/Foxiary/VE-ES/commit/019ccceaf78e4862519e4164e9e0d317da5d745b), downloaded October 3, 2026.
+`engine/` is a git submodule of [Foxiary/VE-ES](https://github.com/Foxiary/VE-ES), currently at commit `019ccce`. To move it to a newer upstream revision, run `git -C engine pull origin master` and commit the new `engine` pointer. Add the hashes of the files being replaced to `src/engine-update.json` first, so existing workspaces that still hold the old bundled files are updated.
