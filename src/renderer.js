@@ -1,18 +1,7 @@
 const $ = id => document.getElementById(id);
-const groups = ['Build', 'Fonts', 'Archives', 'Sheets', 'Apply', 'Executable', 'Diagnostics'];
-const symbols = {Build:'◈',Fonts:'Aa',Archives:'▤',Sheets:'▦',Apply:'↗',Executable:'⌘',Diagnostics:'◎'};
-const summaries = {
-  Build: 'Create the translated SYSTEM.cpk from your project assets.',
-  Fonts: 'Generate, inspect, and adjust FFU bitmap fonts.',
-  Archives: 'Explore and repack game containers and assets.',
-  Sheets: 'Extract, align, and prepare translation workbooks.',
-  Apply: 'Write translations back into game resources.',
-  Executable: 'Inspect and patch text stored in ExeFS.',
-  Diagnostics: 'Check rendered text against game font metrics.'
-};
 let state;
-let activeGroup = 'Build';
-let activeId = 'build';
+let activeGroup = null;
+let activeId = null;
 let running = false;
 let formValues = {};
 let currentLog = '';
@@ -24,10 +13,42 @@ function elt(tag, className, text) {
   if (text !== undefined) node.textContent = text;
   return node;
 }
-function tool() { return state.tools.find(item => item.id === activeId); }
+function engine() { return state.engines.find(item => item.id === state.settings.engine); }
+function tools() { return engine().tools; }
+function tool() { return tools().find(item => item.id === activeId); }
+// Land on the first tool of the engine unless the current selection belongs to it.
+function selectDefault() {
+  if (tool()) return;
+  activeGroup = engine().groups.find(group => tools().some(t => t.group === group));
+  activeId = tools().find(t => t.group === activeGroup)?.id;
+}
 function updateWorkspace() {
-  $('workspace-name').textContent = state.settings.workspace.split(/[\\/]/).pop() || 'Project';
-  $('workspace-path').textContent = state.settings.workspace;
+  $('workspace-name').textContent = state.workspace.split(/[\\/]/).pop() || 'Project';
+  $('workspace-path').textContent = state.workspace;
+}
+function renderEngines() {
+  const box = $('engines'); box.replaceChildren();
+  for (const item of state.engines) {
+    const button = elt('button', `engine-button ${item.id === state.settings.engine ? 'active' : ''}`);
+    button.type = 'button';
+    button.title = item.subtitle;
+    button.append(elt('strong', '', item.name), elt('small', '', item.subtitle));
+    button.addEventListener('click', () => switchEngine(item.id));
+    box.append(button);
+  }
+}
+async function switchEngine(id) {
+  if (id === state.settings.engine) return;
+  if (running) {showError('Wait for the current command to finish before switching engines.'); return;}
+  captureValues();
+  try {
+    const result = await window.vees.setEngine(id);
+    state.settings = result.settings; state.workspace = result.workspace;
+    $('search').value = '';
+    selectDefault();
+    updatePython(result.python);
+    render();
+  } catch (error) {showError(error.message);}
 }
 function updatePython(check) {
   const badge = $('python-status');
@@ -37,14 +58,15 @@ function updatePython(check) {
 }
 function renderGroups() {
   const nav = $('groups'); nav.replaceChildren();
+  const {groups, symbols} = engine();
   for (const group of groups) {
-    const count = state.tools.filter(t => t.group === group).length;
+    const count = tools().filter(t => t.group === group).length;
     const button = elt('button', `group-button ${activeGroup === group ? 'active' : ''}`);
     button.type = 'button';
     button.append(elt('span', 'icon', symbols[group]), elt('span', '', group), elt('span', 'count', String(count)));
     button.addEventListener('click', () => {
       captureValues(); activeGroup = group; $('search').value = '';
-      const first = state.tools.find(t => t.group === group);
+      const first = tools().find(t => t.group === group);
       if (first) activeId = first.id;
       render();
     });
@@ -53,10 +75,10 @@ function renderGroups() {
 }
 function renderTools() {
   const query = $('search').value.toLowerCase().trim();
-  const visible = state.tools.filter(t => query ? `${t.title} ${t.description} ${t.group} ${t.script}`.toLowerCase().includes(query) : t.group === activeGroup);
+  const visible = tools().filter(t => query ? `${t.title} ${t.description} ${t.group} ${t.script}`.toLowerCase().includes(query) : t.group === activeGroup);
   $('group-title').textContent = query ? 'Search results' : activeGroup;
-  $('group-subtitle').textContent = query ? `${visible.length} matching commands across the toolkit.` : summaries[activeGroup];
-  $('tool-count').textContent = String(state.tools.length);
+  $('group-subtitle').textContent = query ? `${visible.length} matching ${engine().name} commands.` : engine().summaries[activeGroup];
+  $('tool-count').textContent = String(tools().length);
   const list = $('tool-list'); list.replaceChildren();
   if (!visible.length) list.append(elt('div', 'empty', 'No commands match this search.'));
   for (const t of visible) {
@@ -82,7 +104,7 @@ function captureValues() {
 }
 function renderForm() {
   const current = tool();
-  $('breadcrumb').textContent = `${current.group.toUpperCase()} / ${current.script.toUpperCase()}`;
+  $('breadcrumb').textContent = `${engine().name.toUpperCase()} / ${current.group.toUpperCase()} / ${current.script.toUpperCase()}`;
   $('tool-title').textContent = current.title;
   $('tool-description').textContent = current.description;
   $('notice').classList.toggle('hidden', !current.note);
@@ -126,11 +148,11 @@ function renderForm() {
     }
     fields.append(field);
   }
-  $('run-hint').textContent = `${current.script}${current.prefix.length ? ' ' + current.prefix.join(' ') : ''} · ${state.settings.workspace}`;
+  $('run-hint').textContent = `${current.script}${current.prefix.length ? ' ' + current.prefix.join(' ') : ''} · ${state.workspace}`;
   $('run-button').disabled = running;
   $('cancel-button').disabled = !running;
 }
-function render() {renderGroups();renderTools();renderForm();updateWorkspace();}
+function render() {renderEngines();renderGroups();renderTools();renderForm();updateWorkspace();}
 function showError(message) {
   $('notice').classList.remove('hidden');
   $('notice').textContent = message;
@@ -150,16 +172,16 @@ function paragraph(parent, text, cls = '') {parent.append(elt('p',cls,text));}
 function action(parent, label, callback) {const b=elt('button','',label); b.type='button';b.addEventListener('click', callback);parent.append(b);}
 function showDocs() {
   dialogContent('Source documentation', body => {
-    paragraph(body,'The app includes the original Python scripts and copies them into a workspace. It does not include game assets, fonts, translations, or Nintendo keys.');
-    paragraph(body,'The recommended translation flow is: create a sheet → translate column C → merge and relink → apply by ID → repack.');
-    for (const [label,name] of [['Translation workflow','DICH.md'],['Format notes','CLAUDE.md'],['Tool reference','tools/README.md'],['Font setup','Font/README.md']]) {
+    paragraph(body,`The ${engine().name} engine's Python scripts are copied into its own workspace. The app does not include game assets, fonts, translations, or Nintendo keys.`);
+    paragraph(body,`Recommended flow: ${engine().flow}`);
+    for (const [label,name] of engine().docs) {
       action(body,label,async()=>{const error=await window.vees.openDocument(name);if(error)showError(error);});
     }
   });
 }
 function showPython() {
   dialogContent('Python environment', body => {
-    paragraph(body,'The original tools require Python 3, Pillow, fontTools, openpyxl, and NumPy. Set up an isolated environment for this app, or choose an existing Python installation.');
+    paragraph(body,`The ${engine().name} tools need Python 3 with these modules: ${engine().modules.join(', ')}. Set up an isolated environment for this app, which installs the packages for every engine, or choose an existing Python installation.`);
     paragraph(body,`Current executable: ${state.settings.python}`,'mono');
     action(body,'Set up Python packages', async () => {
       try {await window.vees.setupPython();$('info-dialog').close();}
@@ -177,13 +199,14 @@ function showPython() {
 async function start() {
   state = await window.vees.state();
   formValues = structuredClone(state.settings.values || {});
+  selectDefault();
   updatePython(state.python);
   render();
   $('search').addEventListener('input', renderTools);
   $('workspace-button').addEventListener('click', async () => {
     try {
       const result = await window.vees.chooseWorkspace();
-      if (result) {state.settings.workspace = result.workspace;updateWorkspace();renderForm();updatePython(result.python);}
+      if (result) {state.workspace = result.workspace;updateWorkspace();renderForm();updatePython(result.python);}
     } catch(error){showError(error.message);}
   });
   $('open-folder').addEventListener('click', async () => {const error=await window.vees.openWorkspace();if(error)showError(error);});
@@ -210,7 +233,7 @@ async function start() {
     running=false;renderForm();const ok=event.code===0;
     setLog(`${currentLog}\n${ok?'Completed successfully':event.signal?'Stopped':`Exited with code ${event.code}`}\n`);
     status(ok?'Complete':event.signal?'Stopped':'Failed',ok?'success':'failed');
-    window.vees.state().then(fresh=>{state.settings=fresh.settings;updatePython(fresh.python);}).catch(()=>{});
+    window.vees.state().then(fresh=>{state.settings=fresh.settings;state.workspace=fresh.workspace;updatePython(fresh.python);}).catch(()=>{});
   });
 }
 start().catch(error=>{document.body.textContent=`Unable to start Otome Translator: ${error.message}`;});

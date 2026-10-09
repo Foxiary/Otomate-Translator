@@ -2,6 +2,7 @@ const {contextBridge, ipcRenderer} = require('electron');
 
 contextBridge.exposeInMainWorld('vees', {
   state: () => ipcRenderer.invoke('state'),
+  setEngine: id => ipcRenderer.invoke('set-engine', id),
   chooseWorkspace: () => ipcRenderer.invoke('choose-workspace'),
   choosePath: (kind, current) => ipcRenderer.invoke('choose-path', kind, current),
   choosePython: () => ipcRenderer.invoke('choose-python'),

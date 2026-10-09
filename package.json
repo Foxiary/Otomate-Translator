@@ -6,7 +6,7 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "check": "node --check src/main.js && node --check src/preload.js && node --check src/renderer.js && node --check src/catalog.js && node --check src/update-check.js && node --check src/update-ui.js",
+    "check": "node --check src/main.js && node --check src/preload.js && node --check src/renderer.js && node --check src/catalog-otomate.js && node --check src/catalog-unity.js && node --check src/engines.js && node --check src/update-check.js && node --check src/update-ui.js",
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win",
     "dist:linux": "electron-builder --linux"
@@ -20,7 +20,8 @@
     "productName": "Otome Translator",
     "files": [
       "src/**/*",
-      "engine/**/*",
+      "engines/**/*",
+      "!engines/**/__pycache__",
       "assets/**/*",
       "requirements.txt",
       "README.md",

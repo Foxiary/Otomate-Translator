@@ -2,8 +2,7 @@ const {app, BrowserWindow, dialog, ipcMain, shell, Notification} = require('elec
 const fs = require('node:fs');
 const path = require('node:path');
 const {spawn, spawnSync} = require('node:child_process');
-const {tools} = require('./catalog');
-const previousHashes = require('./engine-update.json');
+const {engines} = require('./engines');
 const {checkForUpdate} = require('./update-check');
 
 let window;
@@ -11,8 +10,9 @@ let currentRun = null;
 let settings;
 let lastUpdate = null;
 let updateRequest = null;
-const SOURCE_COMMIT = '5791cbd30adeaa5e74947a8fd4465a5d3c5460d5';
-const byId = new Map(tools.map(tool => [tool.id, tool]));
+const SOURCE_COMMIT = 'fc4fa6899cac3eb8f62360c165e0245dcba7b3ed';
+const engineById = new Map(engines.map(engine => [engine.id, engine]));
+const toolById = new Map(engines.flatMap(engine => engine.tools.map(tool => [tool.id, {engine, tool}])));
 
 function settingsPath() { return path.join(app.getPath('userData'), 'settings.json'); }
 // Until 1.2.1 the package was named ve-es-desktop, and Electron keys the user data
@@ -28,7 +28,16 @@ function loadSettings() {
   try { migrateSettings(); } catch {}
   try { settings = JSON.parse(fs.readFileSync(settingsPath(), 'utf8')); }
   catch { settings = {}; }
-  settings.workspace ||= path.join(app.getPath('userData'), 'workspace');
+  // One workspace per engine. Before the Unity engine there was a single one,
+  // and it belonged to the Otomate tools.
+  settings.workspaces ||= {};
+  if (settings.workspace && !settings.workspaces.otomate) settings.workspaces.otomate = settings.workspace;
+  delete settings.workspace;
+  for (const engine of engines) {
+    settings.workspaces[engine.id] ||= path.join(app.getPath('userData'),
+      engine.id === 'otomate' ? 'workspace' : `workspace-${engine.id}`);
+  }
+  if (!engineById.has(settings.engine)) settings.engine = 'otomate';
   settings.python ||= process.platform === 'win32' ? 'py' : 'python3';
   settings.history ||= [];
   settings.values ||= {};
@@ -37,28 +46,36 @@ function saveSettings() {
   fs.mkdirSync(path.dirname(settingsPath()), {recursive: true});
   fs.writeFileSync(settingsPath(), JSON.stringify(settings, null, 2));
 }
-function enginePath() { return path.resolve(__dirname, '..', 'engine'); }
-function copyMissing(source, target, relative) {
+function activeEngine() { return engineById.get(settings.engine); }
+function workspace() { return settings.workspaces[settings.engine]; }
+function enginePath(engine) { return path.resolve(__dirname, '..', 'engines', engine.dir); }
+function sha256(data) { return require('node:crypto').createHash('sha256').update(data).digest('hex'); }
+function copyMissing(source, target, relative, previousHashes) {
+  if (!fs.existsSync(source)) return;
   const stat = fs.statSync(source);
   if (stat.isDirectory()) {
+    if (['__pycache__', '.git'].includes(path.basename(source))) return;
     fs.mkdirSync(target, {recursive: true});
-    for (const name of fs.readdirSync(source)) copyMissing(path.join(source, name), path.join(target, name), `${relative}/${name}`);
+    for (const name of fs.readdirSync(source)) copyMissing(path.join(source, name), path.join(target, name), `${relative}/${name}`, previousHashes);
   } else if (!fs.existsSync(target)) fs.copyFileSync(source, target);
   else if (previousHashes[relative]) {
-    const hash = require('node:crypto').createHash('sha256').update(fs.readFileSync(target)).digest('hex');
-    if (hash === previousHashes[relative]) fs.copyFileSync(source, target);
+    // Hashes are recorded over LF text, so a CRLF checkout must match too.
+    const data = fs.readFileSync(target);
+    const lf = Buffer.from(data.toString('latin1').split('\r\n').join('\n'), 'latin1');
+    if ([sha256(data), sha256(lf)].includes(previousHashes[relative])) fs.copyFileSync(source, target);
   }
 }
-function prepareWorkspace(folder) {
+function prepareWorkspace(folder, engine) {
   fs.mkdirSync(folder, {recursive: true});
-  for (const name of ['tools', 'build.py', 'fonts.json', 'DICH.md', 'CLAUDE.md', 'Font']) {
-    copyMissing(path.join(enginePath(), name), path.join(folder, name), name);
+  for (const name of engine.copy) {
+    copyMissing(path.join(enginePath(engine), name), path.join(folder, name), name, engine.hashes);
   }
-  copyMissing(path.resolve(__dirname, '..', 'requirements.txt'), path.join(folder, 'requirements.txt'), 'requirements.txt');
+  copyMissing(path.resolve(__dirname, '..', 'requirements.txt'), path.join(folder, 'requirements.txt'), 'requirements.txt', engine.hashes);
 }
 function pythonCheck() {
+  const modules = activeEngine().modules.join(', ');
   const result = spawnSync(settings.python, ['-c',
-    'import sys, PIL, fontTools, openpyxl, numpy; print(sys.version.split()[0])'],
+    `import sys, ${modules}; print(sys.version.split()[0])`],
     {encoding: 'utf8', timeout: 10000, windowsHide: true});
   return {ok: result.status === 0, version: result.status === 0 ? result.stdout.trim() : '',
     message: result.status === 0 ? '' : (result.stderr || result.error?.message || 'Python could not start').trim()};
@@ -122,7 +139,7 @@ function createWindow() {
 app.whenReady().then(() => {
   if (process.platform === 'win32') app.setAppUserModelId('dev.vees.desktop');
   loadSettings();
-  prepareWorkspace(settings.workspace);
+  prepareWorkspace(workspace(), activeEngine());
   saveSettings();
   createWindow();
   const updateTimer = setInterval(() => {
@@ -134,8 +151,21 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('before-quit', () => { if (currentRun) currentRun.child.kill(); });
 
-ipcMain.handle('state', () => ({tools, settings, python: pythonCheck(), running: !!currentRun,
-  sourceCommit: SOURCE_COMMIT, appVersion: app.getVersion()}));
+function publicEngines() {
+  return engines.map(({id, name, subtitle, docs, flow, modules, groups, symbols, summaries, tools}) =>
+    ({id, name, subtitle, docs, flow, modules, groups, symbols, summaries, tools}));
+}
+ipcMain.handle('state', () => ({engines: publicEngines(), settings, workspace: workspace(),
+  python: pythonCheck(), running: !!currentRun, sourceCommit: SOURCE_COMMIT, appVersion: app.getVersion()}));
+ipcMain.handle('set-engine', (_event, id) => {
+  if (currentRun) throw new Error('Wait for the current command to finish before switching engines.');
+  const engine = engineById.get(id);
+  if (!engine) throw new Error('Unknown engine.');
+  settings.engine = id;
+  prepareWorkspace(workspace(), engine);
+  saveSettings();
+  return {settings, workspace: workspace(), python: pythonCheck()};
+});
 ipcMain.handle('check-update', () => performUpdateCheck());
 ipcMain.handle('dismiss-update', (_event, commit) => {
   if (lastUpdate?.status !== 'available' || commit !== lastUpdate.latestCommit) return false;
@@ -149,16 +179,16 @@ ipcMain.handle('open-update', () => {
   return shell.openExternal(lastUpdate.url);
 });
 ipcMain.handle('choose-workspace', async () => {
-  const result = await dialog.showOpenDialog(window, {title: 'Choose a project folder',
-    defaultPath: settings.workspace, properties: ['openDirectory', 'createDirectory']});
+  const result = await dialog.showOpenDialog(window, {title: `Choose a ${activeEngine().name} project folder`,
+    defaultPath: workspace(), properties: ['openDirectory', 'createDirectory']});
   if (result.canceled) return null;
-  prepareWorkspace(result.filePaths[0]);
-  settings.workspace = result.filePaths[0];
+  prepareWorkspace(result.filePaths[0], activeEngine());
+  settings.workspaces[settings.engine] = result.filePaths[0];
   saveSettings();
-  return {workspace: settings.workspace, python: pythonCheck()};
+  return {workspace: workspace(), python: pythonCheck()};
 });
 ipcMain.handle('choose-path', async (_event, kind, current) => {
-  const defaultPath = current || settings.workspace;
+  const defaultPath = current || workspace();
   if (kind === 'save') {
     const result = await dialog.showSaveDialog(window, {defaultPath});
     return result.canceled ? null : result.filePath;
@@ -185,7 +215,7 @@ ipcMain.handle('setup-python', () => {
   const step = (command, args) => new Promise(resolve => {
     if (currentRun?.cancelled) return resolve(130);
     emit('run-output', {runId, stream: 'stdout', text: `$ ${[command, ...args].join(' ')}\n`});
-    const child = spawn(command, args, {cwd: settings.workspace, windowsHide: true, shell: false});
+    const child = spawn(command, args, {cwd: workspace(), windowsHide: true, shell: false});
     currentRun.child = child;
     child.stdout.on('data', data => emit('run-output', {runId, stream: 'stdout', text: data.toString('utf8')}));
     child.stderr.on('data', data => emit('run-output', {runId, stream: 'stderr', text: data.toString('utf8')}));
@@ -195,7 +225,7 @@ ipcMain.handle('setup-python', () => {
   (async () => {
     let code = fs.existsSync(executable) ? 0 : await step(settings.python, ['-m', 'venv', environment]);
     if (code === 0 && !currentRun.cancelled) code = await step(executable,
-      ['-m', 'pip', 'install', '--disable-pip-version-check', '-r', path.join(settings.workspace, 'requirements.txt')]);
+      ['-m', 'pip', 'install', '--disable-pip-version-check', '-r', path.join(workspace(), 'requirements.txt')]);
     if (code === 0 && !currentRun.cancelled) {
       settings.python = executable;
       saveSettings();
@@ -211,26 +241,28 @@ ipcMain.handle('setup-python', () => {
   });
   return {runId};
 });
-ipcMain.handle('open-workspace', () => shell.openPath(settings.workspace));
+ipcMain.handle('open-workspace', () => shell.openPath(workspace()));
 ipcMain.handle('open-document', (_event, name) => {
-  if (!['DICH.md', 'CLAUDE.md', 'Font/README.md', 'tools/README.md'].includes(name)) throw new Error('Unknown document');
-  return shell.openPath(path.join(settings.workspace, name));
+  if (!activeEngine().docs.some(([, doc]) => doc === name)) throw new Error('Unknown document');
+  return shell.openPath(path.join(workspace(), name));
 });
 ipcMain.handle('run-tool', (_event, id, values) => {
   if (currentRun) throw new Error('Another command is already running.');
-  const tool = byId.get(id);
-  if (!tool) throw new Error('Unknown tool.');
+  const entry = toolById.get(id);
+  if (!entry || entry.engine.id !== settings.engine) throw new Error('Unknown tool.');
+  const {tool} = entry;
   if (!values || typeof values !== 'object') throw new Error('Missing input values.');
   const args = makeArgs(tool, values);
-  const script = path.resolve(settings.workspace, tool.script);
-  if (!script.startsWith(path.resolve(settings.workspace) + path.sep) && script !== path.resolve(settings.workspace, 'build.py')) throw new Error('Invalid script path.');
+  const root = path.resolve(workspace());
+  const script = path.resolve(root, tool.script);
+  if (!script.startsWith(root + path.sep)) throw new Error('Invalid script path.');
   if (!fs.existsSync(script)) throw new Error('Script is missing from the project folder.');
   settings.values[id] = values;
   saveSettings();
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const started = new Date().toISOString();
   const child = spawn(settings.python, ['-u', script, ...args],
-    {cwd: settings.workspace, env: {...process.env, PYTHONIOENCODING: 'utf-8'}, windowsHide: true, shell: false});
+    {cwd: root, env: {...process.env, PYTHONIOENCODING: 'utf-8'}, windowsHide: true, shell: false});
   currentRun = {runId, child, id};
   emit('run-start', {runId, id, title: tool.title, started, command: [settings.python, tool.script, ...args]});
   child.stdout.on('data', data => emit('run-output', {runId, stream: 'stdout', text: data.toString('utf8')}));
@@ -238,7 +270,7 @@ ipcMain.handle('run-tool', (_event, id, values) => {
   child.on('error', error => emit('run-output', {runId, stream: 'stderr', text: `${error.message}\n`}));
   child.on('close', (code, signal) => {
     currentRun = null;
-    settings.history.unshift({id, title: tool.title, started, code, signal});
+    settings.history.unshift({id, engine: settings.engine, title: tool.title, started, code, signal});
     settings.history = settings.history.slice(0, 30);
     saveSettings();
     emit('run-end', {runId, code, signal});
