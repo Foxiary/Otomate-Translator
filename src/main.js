@@ -1,13 +1,17 @@
-const {app, BrowserWindow, dialog, ipcMain, shell} = require('electron');
+const {app, BrowserWindow, dialog, ipcMain, shell, Notification} = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const {spawn, spawnSync} = require('node:child_process');
 const {tools} = require('./catalog');
 const previousHashes = require('./engine-update.json');
+const {checkForUpdate} = require('./update-check');
 
 let window;
 let currentRun = null;
 let settings;
+let lastUpdate = null;
+let updateRequest = null;
+const SOURCE_COMMIT = '5791cbd30adeaa5e74947a8fd4465a5d3c5460d5';
 const byId = new Map(tools.map(tool => [tool.id, tool]));
 
 function settingsPath() { return path.join(app.getPath('userData'), 'settings.json'); }
@@ -50,6 +54,24 @@ function pythonCheck() {
     message: result.status === 0 ? '' : (result.stderr || result.error?.message || 'Python could not start').trim()};
 }
 function emit(event, payload) { if (window && !window.isDestroyed()) window.webContents.send(event, payload); }
+function performUpdateCheck() {
+  if (updateRequest) return updateRequest;
+  updateRequest = checkForUpdate(SOURCE_COMMIT).then(result => {
+    lastUpdate = {...result, dismissed: settings.dismissedUpdateCommit === result.latestCommit};
+    if (result.status === 'available' && settings.lastNotifiedUpdateCommit !== result.latestCommit) {
+      settings.lastNotifiedUpdateCommit = result.latestCommit;
+      saveSettings();
+      if (app.isPackaged && Notification.isSupported()) {
+        const notice = new Notification({title: 'VE-ES Desktop: source update',
+          body: `New VE-ES code is available: ${result.latestCommit.slice(0, 7)}`});
+        notice.on('click', () => {window?.show(); window?.focus();});
+        notice.show();
+      }
+    }
+    return lastUpdate;
+  }).catch(error => ({status: 'error', message: error.message})).finally(() => {updateRequest = null;});
+  return updateRequest;
+}
 function displayName(arg) { return arg.name.replace(/^--/, '').replace(/-/g, ' '); }
 function makeArgs(tool, values) {
   const args = [...tool.prefix];
@@ -88,16 +110,34 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  if (process.platform === 'win32') app.setAppUserModelId('dev.vees.desktop');
   loadSettings();
   prepareWorkspace(settings.workspace);
   saveSettings();
   createWindow();
+  const updateTimer = setInterval(() => {
+    performUpdateCheck().then(result => emit('update-status', result));
+  }, 24 * 60 * 60 * 1000);
+  updateTimer.unref();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('before-quit', () => { if (currentRun) currentRun.child.kill(); });
 
-ipcMain.handle('state', () => ({tools, settings, python: pythonCheck(), running: !!currentRun}));
+ipcMain.handle('state', () => ({tools, settings, python: pythonCheck(), running: !!currentRun,
+  sourceCommit: SOURCE_COMMIT, appVersion: app.getVersion()}));
+ipcMain.handle('check-update', () => performUpdateCheck());
+ipcMain.handle('dismiss-update', (_event, commit) => {
+  if (lastUpdate?.status !== 'available' || commit !== lastUpdate.latestCommit) return false;
+  settings.dismissedUpdateCommit = commit;
+  saveSettings();
+  lastUpdate.dismissed = true;
+  return true;
+});
+ipcMain.handle('open-update', () => {
+  if (lastUpdate?.status !== 'available') return false;
+  return shell.openExternal(lastUpdate.url);
+});
 ipcMain.handle('choose-workspace', async () => {
   const result = await dialog.showOpenDialog(window, {title: 'Choose a VE-ES project folder',
     defaultPath: settings.workspace, properties: ['openDirectory', 'createDirectory']});

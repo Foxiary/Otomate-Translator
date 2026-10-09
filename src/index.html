@@ -19,6 +19,7 @@
       <div class="rail-bottom">
         <button class="rail-link" id="docs-button"><span>◇</span> Source documentation</button>
         <button class="rail-link" id="python-button"><span>⌘</span> Python environment</button>
+        <button class="rail-link" id="check-updates"><span>↻</span> Check updates</button>
         <div class="source-note">Powered by the original VE-ES Python tools.<br>Game assets are supplied by you.</div>
       </div>
     </aside>
@@ -32,6 +33,7 @@
     </section>
     <main class="main-pane">
       <header class="main-header"><div><div class="eyebrow" id="breadcrumb">BUILD / COMMAND</div><h2 id="tool-title">Build mod</h2><p id="tool-description"></p></div><div id="python-status" class="env-pill">Checking Python</div></header>
+      <div id="update-banner" class="update-banner hidden" role="status"><div><strong id="update-title"></strong><p id="update-message"></p></div><div class="update-actions"><button id="update-open" class="update-primary hidden">View changes ↗</button><button id="update-dismiss" class="update-secondary">Dismiss</button></div></div>
       <div id="notice" class="notice hidden"></div>
       <section class="form-section">
         <div class="section-heading"><span>01</span><h3>Configuration</h3><p>Paths can be absolute or relative to the project folder.</p></div>
@@ -43,5 +45,6 @@
   </div>
   <dialog id="info-dialog"><div class="dialog-head"><h2 id="dialog-title"></h2><button id="dialog-close" aria-label="Close">×</button></div><div id="dialog-body"></div></dialog>
   <script src="renderer.js"></script>
+  <script src="update-ui.js"></script>
 </body>
 </html>

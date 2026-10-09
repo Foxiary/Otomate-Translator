@@ -1,12 +1,12 @@
 {
   "name": "ve-es-desktop",
-  "version": "1.1.0",
+  "version": "1.2.1",
   "private": true,
   "description": "Desktop interface for the VE-ES translation and font toolkit",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "check": "node --check src/main.js && node --check src/preload.js && node --check src/renderer.js && node --check src/catalog.js",
+    "check": "node --check src/main.js && node --check src/preload.js && node --check src/renderer.js && node --check src/catalog.js && node --check src/update-check.js && node --check src/update-ui.js",
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win",
     "dist:linux": "electron-builder --linux"

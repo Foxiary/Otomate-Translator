@@ -159,7 +159,7 @@ function showDocs() {
 }
 function showPython() {
   dialogContent('Python environment', body => {
-    paragraph(body,'The original tools require Python 3, Pillow, fontTools, and openpyxl. Set up an isolated environment for this app, or choose an existing Python installation.');
+    paragraph(body,'The original tools require Python 3, Pillow, fontTools, openpyxl, and NumPy. Set up an isolated environment for this app, or choose an existing Python installation.');
     paragraph(body,`Current executable: ${state.settings.python}`,'mono');
     action(body,'Set up Python packages', async () => {
       try {await window.vees.setupPython();$('info-dialog').close();}

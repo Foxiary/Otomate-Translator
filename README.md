@@ -1,33 +1,45 @@
-# VE-ES Desktop
+# Otomate Translator
 
-An Electron interface for the [VE-ES toolkit](https://github.com/Foxiary/VE-ES). It includes the repository's Python scripts and exposes all 34 current command-line operations through forms with file pickers, live output, and cancellation. The included `ffugen.py` is updated to the latest upstream revision, including dark outline rendering with `--stroke`.
+Ứng dụng Electron cho bộ công cụ Việt hóa game Otomate / Idea Factory ([VE-ES](https://github.com/Foxiary/VE-ES)): container CRI `.cpk`, kịch bản `STCM2L`, cơ sở dữ liệu `.gbin`/`.gstr` và font bitmap `.ffu`. Giao diện cung cấp biểu mẫu, chọn tệp, nhật ký trực tiếp và nút dừng cho 34 thao tác dòng lệnh của bộ công cụ.
 
-The app does **not** include game data, fonts, translation workbooks, or keys. Supply your own files in a project folder. Scripts, `build.py`, `fonts.json`, and source documentation are copied into a new folder when you select it. Existing files are kept.
+Ứng dụng không chứa dữ liệu game, font, bảng dịch hoặc khóa. Khi chọn một thư mục dự án, ứng dụng chép các script, `build.py`, `fonts.json` và tài liệu nguồn còn thiếu vào đó. Tệp người dùng đã sửa được giữ nguyên.
 
-## Start
+## Tải về
 
-1. Install Node.js and Python 3.
-2. Clone with the toolkit submodule: `git clone --recursive https://github.com/Foxiary/VE-ES-Desktop.git`. In an existing clone, run `git submodule update --init`.
-3. From this folder, run `npm install` and `npm start`.
-4. In the app, open **Python environment → Set up Python packages**. This creates a private environment under the app's user data folder and installs Pillow, fontTools, openpyxl, and NumPy. You can instead choose an existing Python executable with those packages installed.
-5. Use **Workspace** to choose the folder holding your game assets. See **Source documentation** for the expected layout and translation workflow.
+Bản đóng gói nằm ở [Releases](https://github.com/Foxiary/Otomate-Translator/releases). Các gói chưa được ký số, nên Windows SmartScreen hoặc macOS Gatekeeper có thể cảnh báo.
 
-If npm blocks Electron's install script, run `npm approve-scripts electron` and `node node_modules/electron/install.js` once.
+## Chạy từ mã nguồn
 
-## Package
+1. Cài Node.js và Python 3.
+2. Clone kèm submodule engine: `git clone --recursive https://github.com/Foxiary/Otomate-Translator.git`. Nếu đã clone rồi thì chạy `git submodule update --init`.
+3. Trong thư mục repo, chạy `npm install` rồi `npm start`.
+4. Trong ứng dụng, chọn **Python environment → Set up Python packages** để tạo môi trường riêng và cài Pillow, fontTools, openpyxl, NumPy. Bạn cũng có thể chọn một Python đã cài các thư viện này.
+5. Chọn thư mục chứa dữ liệu dự án trong **Workspace**. Xem **Source documentation** để biết bố cục và quy trình dịch.
+
+Nếu npm chặn bước cài Electron, chạy `npm approve-scripts electron` và `node node_modules/electron/install.js` một lần.
+
+## Đóng gói
 
 - macOS: `npm run dist:mac`
 - Windows x64: `npm run dist:win -- --x64`
 - Linux: `npm run dist:linux`
 
-This delivery includes a macOS Apple Silicon DMG, plus a Windows x64 installer and portable executable. The builds are unsigned, so macOS Gatekeeper or Windows SmartScreen may show a warning. The Windows packages were built on macOS and could not be launched here; build on Windows for native runtime testing.
+## Engine
 
-## How the app works
+`engine/` là submodule của [Foxiary/VE-ES](https://github.com/Foxiary/VE-ES), hiện ở commit `5791cbd`. Bản này có viền tối `--stroke`, và dấu câu tiếng Nhật (`？！。「」…`) được vẽ bằng glyph Latin của font nguồn (tắt bằng `--no-normalize-punctuation`).
 
-Each operation launches an original Python script with an argument array, without a shell. Repeated values such as `--font` and `--sheet` use one value per line. Relative paths resolve from the selected workspace. Run output appears in the log. The **Stop** button terminates the current process.
+Để lên bản engine mới:
 
-`build.py` is specific to the Virche project layout. Most tools also accept input from another Otomate game as documented upstream. `translate_glossary.py` contains fixed sample translations from the source repository; its form labels them as samples.
+1. Ghi hash SHA-256 (sau khi đổi CRLF thành LF) của các file sắp bị thay vào `src/engine-update.json`. Workspace nào còn giữ đúng bản cũ đó sẽ được chép bản mới khi mở app.
+2. `git -C engine pull origin master`, rồi commit con trỏ `engine` mới.
+3. Sửa `SOURCE_COMMIT` trong `src/main.js` thành commit engine mới.
 
-On startup, the app updates scripts and configuration in an existing workspace only when they still match the previous bundled revision. User edited files are preserved. New files are added. Retired upstream scripts may remain in older workspaces but no longer appear in the tool catalog.
+## Thông báo cập nhật
 
-`engine/` is a git submodule of [Foxiary/VE-ES](https://github.com/Foxiary/VE-ES), currently at commit `019ccce`. To move it to a newer upstream revision, run `git -C engine pull origin master` and commit the new `engine` pointer. Add the hashes of the files being replaced to `src/engine-update.json` first, so existing workspaces that still hold the old bundled files are updated.
+Khi mở ứng dụng và mỗi ngày một lần, ứng dụng kiểm tra commit mới nhất của VE-ES. Nếu khác `SOURCE_COMMIT`, ứng dụng hiển thị thông báo trong cửa sổ và, nếu hệ điều hành hỗ trợ, một thông báo desktop. Nút **Check updates** kiểm tra ngay. Ứng dụng không tự tải hay cài mã mới. Lỗi mạng hoặc giới hạn API không cản trở công việc.
+
+## Cách hoạt động
+
+Mỗi thao tác chạy script Python gốc với danh sách tham số, không qua shell. Các giá trị lặp như `--font` và `--sheet` dùng mỗi dòng một giá trị. Đường dẫn tương đối được tính từ workspace đã chọn. Nhật ký hiển thị đầu ra; **Stop** dừng tiến trình đang chạy.
+
+`build.py` dành riêng cho bố cục dự án Virche Evermore. Các công cụ khác nhận dữ liệu từ game Otomate khác như tài liệu nguồn mô tả; với `ffugen.py`, đổi game chỉ cần đổi `--template`. Biểu mẫu của `translate_glossary.py` ghi rõ các bản dịch mẫu có sẵn trong repo nguồn.
