@@ -13,9 +13,20 @@ Mỗi engine có workspace, giá trị biểu mẫu và tài liệu riêng; đ�
 
 ## Tải về
 
-Bản đóng gói nằm ở [Releases](https://github.com/Foxiary/Otome-Translator/releases). Các gói chưa được ký số, nên Windows SmartScreen hoặc macOS Gatekeeper có thể cảnh báo.
+Bản đóng gói nằm ở [Releases](https://github.com/Foxiary/Otome-Translator/releases).
 
-Bản cài được build bằng GitHub Actions (`.github/workflows/build.yml`) từ đúng mã nguồn của tag phát hành.
+### Cảnh báo khi cài: cứ chấp nhận
+
+Bản cài **chưa được ký số**, nên Windows và macOS sẽ cảnh báo "không rõ nhà phát hành". Cảnh báo này chỉ có nghĩa là file chưa có chữ ký số. Nó không có nghĩa là hệ điều hành phát hiện ra virus. **Otome Translator không chứa virus hay mã độc.** Toàn bộ mã nguồn công khai trong repo này, và app không gửi dữ liệu của bạn đi đâu (xem [Quyền riêng tư](#quyền-riêng-tư)).
+
+- **Windows (SmartScreen):** bấm **More info** (Thông tin thêm) → **Run anyway** (Vẫn chạy).
+- **macOS (Gatekeeper):** mở app một lần cho tới khi bị chặn, rồi vào **System Settings → Privacy & Security** và bấm **Open Anyway**.
+- Một số phần mềm diệt virus có thể báo nhầm với file `.exe` mới, chưa ký. Nếu gặp, hãy cho phép file hoặc dùng bản portable.
+
+Muốn tự kiểm chứng thì:
+
+- **Đối chiếu SHA-256** trong ghi chú phát hành với file đã tải. Trên Windows dùng `certutil -hashfile <file> SHA256`.
+- **Xem nơi build:** bản cài được build bằng GitHub Actions (`.github/workflows/build.yml`) từ đúng mã nguồn của tag phát hành, và nhật ký build công khai trong tab Actions.
 
 ## Chính sách ký số
 
