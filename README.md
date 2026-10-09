@@ -18,7 +18,7 @@ Bản đóng gói nằm ở [Releases](https://github.com/Foxiary/Otome-Translat
 
 Nếu npm chặn bước cài Electron, chạy `npm approve-scripts electron` và `node node_modules/electron/install.js` một lần.
 
-Đến bản 1.2.1 app có tên **VE-ES Desktop**. Lần đầu mở bản mới, app chép `settings.json` từ thư mục dữ liệu cũ (`%APPDATA%e-es-desktop` trên Windows) sang, nên workspace và môi trường Python cũ vẫn dùng được.
+Đến bản 1.2.1 app có tên **VE-ES Desktop**. Lần đầu mở bản mới, app chép `settings.json` từ thư mục dữ liệu cũ (`%APPDATA%\ve-es-desktop` trên Windows) sang, nên workspace và môi trường Python cũ vẫn dùng được.
 
 ## Đóng gói
 
