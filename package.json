@@ -1,6 +1,6 @@
 {
   "name": "otome-translator",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "description": "Otome Translator (OTM) - desktop app for translating Otomate / Idea Factory games",
   "main": "src/main.js",
