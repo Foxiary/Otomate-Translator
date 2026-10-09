@@ -17,6 +17,10 @@ Filters for `export`:
   --key REGEX   only values whose own key matches, e.g. `^(jp|text)$` for a game
                 that stores languages side by side and only reads one slot
   --path REGEX  only pointers matching, e.g. `^/data/\\d+/text/`
+  --nested      open string values that are themselves JSON (a choice list kept
+                as the string `{"target":["..."]}`) and export the values
+                inside; each layer adds `#<pointer>` to the ID:
+                `ScenarioData#/target/6/selText/49#/target/0`
 Values that are empty, or contain no letter at all, are skipped unless --all.
 
 `apply` edits the raw JSON text at each value's exact position rather than
@@ -143,6 +147,82 @@ def json_assets(env, glob):
     return out
 
 
+def inner_spans(value):
+    """Spans of `value` if the string is itself a JSON object or array, else None."""
+    if value.lstrip(BOM).lstrip()[:1] not in ("{", "["):
+        return None
+    try:
+        return scan(value)
+    except ValueError:
+        return None
+
+
+def flatten(text, spans, nested, prefix=()):
+    """Yield (levels, value), `levels` holding one pointer per JSON layer.
+
+    With `nested`, a string that is itself JSON is opened and its values are
+    yielded instead of the string; without it every string is a leaf.
+    """
+    for ptr, (s, e) in spans.items():
+        val = json.loads(text[s:e])
+        inner = inner_spans(val) if nested else None
+        if inner is not None:
+            yield from flatten(val, inner, nested, prefix + (ptr,))
+        else:
+            yield prefix + (ptr,), val
+
+
+def value_at(text, spans, levels):
+    """The string at `levels`, or None when there is no such value."""
+    for i, ptr in enumerate(levels):
+        if spans is None or ptr not in spans:
+            return None
+        s, e = spans[ptr]
+        text = json.loads(text[s:e])
+        spans = inner_spans(text) if i + 1 < len(levels) else None
+    return text
+
+
+def rewrite(text, spans, tree):
+    """Replace values in `text`; `tree` maps a pointer to a new string or a subtree."""
+    pieces, pos = [], 0
+    # Assemble once: splicing a 60 MB scenario per value is quadratic.
+    for ptr in sorted(tree, key=lambda p: spans[p][0]):
+        s, e = spans[ptr]
+        item = tree[ptr]
+        if isinstance(item, dict):
+            inner = json.loads(text[s:e])
+            item = rewrite(inner, scan(inner), item)
+        pieces += [text[pos:s], encode_like(text[s:e], item)]
+        pos = e
+    pieces.append(text[pos:])
+    return "".join(pieces)
+
+
+def verify(old, old_spans, new, tree, where):
+    """`new` must equal `old` everywhere except as `tree` says."""
+    new_spans = scan(new)
+    if new_spans.keys() != old_spans.keys():
+        raise SystemExit("%s: JSON structure changed while applying - aborting" % where)
+    for ptr, (s, e) in old_spans.items():
+        a = json.loads(old[s:e])
+        b = json.loads(new[new_spans[ptr][0]:new_spans[ptr][1]])
+        item = tree.get(ptr)
+        if item is None:
+            ok = a == b
+        elif isinstance(item, dict):
+            verify(a, scan(a), b, item, where + "#" + ptr)
+            ok = True
+        else:
+            ok = b == item
+        if not ok:
+            raise SystemExit("%s#%s: value is not what was intended - aborting" % (where, ptr))
+
+
+def make_id(asset, levels):
+    return "#".join((asset,) + tuple(levels))
+
+
 def cmd_export(a):
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Font
@@ -159,19 +239,18 @@ def cmd_export(a):
     rows = too_long = 0
     for o, d, text, spans in json_assets(env, a.name):
         n = 0
-        for ptr, (s, e) in spans.items():
-            last = ptr.rsplit("/", 1)[-1].replace("~1", "/").replace("~0", "~")
+        for levels, val in flatten(text, spans, a.nested):
+            last = levels[-1].rsplit("/", 1)[-1].replace("~1", "/").replace("~0", "~")
             if key_rx and not key_rx.search(last):
                 continue
-            if path_rx and not path_rx.search(ptr):
+            if path_rx and not path_rx.search("#".join(levels)):
                 continue
-            val = json.loads(text[s:e])
             if not a.all and not LETTER_RX.search(val):
                 continue
             if len(val) > CELL_LIMIT:
                 too_long += 1
                 continue
-            ws.append(["%s#%s" % (d.m_Name, ptr), val, None])
+            ws.append([make_id(d.m_Name, levels), val, None])
             n += 1
         rows += n
         print("  %-36s %6d strings" % (d.m_Name, n))
@@ -220,10 +299,10 @@ def cmd_apply(a):
     tokens = [re.compile(t) for t in a.token or []]
     by_asset = {}
     for rid, entry in rows.items():
-        if "#" not in rid:
-            raise SystemExit("row %d: ID %r is not <asset>#<pointer>" % (entry[0], rid))
-        asset, ptr = rid.split("#", 1)
-        by_asset.setdefault(asset, {})[ptr] = entry
+        parts = rid.split("#")
+        if len(parts) < 2 or not all(p.startswith("/") for p in parts[1:]):
+            raise SystemExit("row %d: ID %r is not <asset>#<pointer>[#<pointer>...]" % (entry[0], rid))
+        by_asset.setdefault(parts[0], {})[tuple(parts[1:])] = entry
     assets = {d.m_Name: (o, d, text, spans) for o, d, text, spans in json_assets(env, None)}
     problems, changed, written = [], set(), 0
     for asset, entries in sorted(by_asset.items()):
@@ -231,41 +310,42 @@ def cmd_apply(a):
             problems.append("no JSON TextAsset named %s (%d rows)" % (asset, len(entries)))
             continue
         o, d, text, spans = assets[asset]
-        edits = []
-        for ptr, (row, src, tr) in entries.items():
-            if ptr not in spans:
-                problems.append("row %d: %s#%s is not a string value in the file" % (row, asset, ptr))
+        tree, n = {}, 0
+        for levels, (row, src, tr) in sorted(entries.items(), key=lambda kv: kv[1][0]):
+            where = make_id(asset, levels)
+            cur = value_at(text, spans, levels)
+            if cur is None:
+                problems.append("row %d: %s is not a string value in the file" % (row, where))
                 continue
-            s, e = spans[ptr]
-            cur = json.loads(text[s:e])
             if cur != src and not a.force:
-                problems.append("row %d: Source no longer matches the file at %s#%s" % (row, asset, ptr))
+                problems.append("row %d: Source no longer matches the file at %s" % (row, where))
                 continue
             bad = [t.pattern for t in tokens if len(t.findall(src)) != len(t.findall(tr))]
             if bad:
                 problems.append("row %d: token count differs for %s" % (row, ", ".join(bad)))
                 continue
-            if tr != cur:
-                edits.append((s, e, ptr, tr))
-        if not edits:
+            if tr == cur:
+                continue
+            node = tree
+            for ptr in levels[:-1]:
+                node = node.setdefault(ptr, {})
+                if not isinstance(node, dict):
+                    break
+            if not isinstance(node, dict) or isinstance(node.get(levels[-1]), dict):
+                problems.append("row %d: %s overlaps another row that edits the same JSON string"
+                                % (row, where))
+                continue
+            node[levels[-1]] = tr
+            n += 1
+        if not n:
             continue
-        out = text
-        for s, e, ptr, tr in sorted(edits, reverse=True):
-            out = out[:s] + encode_like(text[s:e], tr) + out[e:]
-        new_spans = scan(out)
-        if new_spans.keys() != spans.keys():
-            raise SystemExit("%s: structure changed while applying - aborting" % asset)
-        want = {ptr: tr for _s, _e, ptr, tr in edits}
-        for ptr, (s, e) in new_spans.items():
-            got = json.loads(out[s:e])
-            old = json.loads(text[spans[ptr][0]:spans[ptr][1]])
-            if got != want.get(ptr, old):
-                raise SystemExit("%s: value at %s is not what was intended" % (asset, ptr))
+        out = rewrite(text, spans, tree)
+        verify(text, spans, out, tree, asset)
         d.m_Script = out
         d.save()
         changed.add(o.path_id)
-        written += len(edits)
-        print("  %-36s %6d values translated" % (asset, len(edits)))
+        written += n
+        print("  %-36s %6d values translated" % (asset, n))
     for p in problems[:50]:
         print("  SKIP " + p)
     if len(problems) > 50:
@@ -294,6 +374,8 @@ def main():
     p.add_argument("--key", help="only values whose key matches this regex")
     p.add_argument("--path", help="only values whose pointer matches this regex")
     p.add_argument("--all", action="store_true", help="keep empty and letter-less values")
+    p.add_argument("--nested", action="store_true",
+                   help="open strings that are themselves JSON and export the values inside")
     add_common(p)
     p = sub.add_parser("apply")
     p.add_argument("file")

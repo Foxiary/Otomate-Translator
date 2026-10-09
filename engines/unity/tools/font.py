@@ -34,7 +34,8 @@ from unityio import (add_common, backup, load, objects, raw_snapshot, save,   # 
 
 VIETNAMESE = ("aàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợ"
               "uùúủũụưừứửữựyỳýỷỹỵđ")
-CHARSETS = {"vietnamese": VIETNAMESE + VIETNAMESE.upper()}
+LATIN = "".join(chr(c) for c in range(0x21, 0x7F))
+CHARSETS = {"vietnamese": VIETNAMESE + VIETNAMESE.upper(), "latin": LATIN}
 
 
 def fonts(env, name=None):

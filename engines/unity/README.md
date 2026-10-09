@@ -17,10 +17,14 @@ fontTools — nút **Set up Python packages** trong app cài đủ.
    (`il2cpp.py find`) và tranh vẽ sẵn chữ.
 3. **Dịch.** `jsonsheet.py export` ra bảng ID | Source | Translation; dịch cột C;
    `jsonsheet.py apply` ghi lại. Từ chối dòng có Source đã lệch với file.
-4. **Font.** `font.py coverage` kiểm font có đủ dấu tiếng Việt không;
-   `font.py replace` thay TTF nguồn của font TextMeshPro động.
-5. **Code.** `il2cpp.py patch` cho hằng chuỗi; `ips32.py` cho bản vá mã máy.
-6. **Đóng gói.** `release.py` ra zip cho Ryujinx và Atmosphère.
+4. **Khung chữ.** `tmp.py list` tìm khung TextMeshPro theo chữ nó hiện;
+   `tmp.py set` nới khung, bật ngắt dòng, cho tự co chữ trong một khoảng.
+5. **Font.** `tmpfont.py info` / `font.py coverage` kiểm font có đủ dấu tiếng Việt
+   không. Font TextMeshPro **động** thì `font.py replace` thay TTF nguồn; font
+   **tĩnh** (glyph nướng sẵn vào atlas) thì `tmpfont.py add` nướng thêm glyph —
+   chạy `tmpfont.py verify` với TTF gốc của font trước để chắc cách nướng khớp.
+6. **Code.** `il2cpp.py patch` cho hằng chuỗi; `ips32.py` cho bản vá mã máy.
+7. **Đóng gói.** `release.py` ra zip cho Ryujinx và Atmosphère.
 
 Mọi lệnh ghi file đều **chạy thử** trước, phải thêm `--apply` (hay `--build`) mới
 ghi; ghi đè lên chính file vào thì giữ bản `.bak`. Sau mỗi lần lưu, công cụ đọc
@@ -33,14 +37,16 @@ python tools/jsonsheet.py export Data/StreamingAssets/scenario/scenario01 scenar
     --name ScenarioData --path "/(text|talkName)/\d+$"
 ```
 
+Lựa chọn lưu dạng JSON nằm **trong** một chuỗi (như `selText` của UNLOGICAL):
+thêm `--nested` khi `export`, ID nối các tầng bằng `#`.
+
 ## Giới hạn
 
-- Chuỗi JSON lồng **bên trong** một chuỗi (như `selText` của UNLOGICAL) không
-  được tách ra sheet; sửa bằng `textasset.py dump/import`.
-- Font TextMeshPro **tĩnh** (glyph nướng sẵn vào atlas) phải dựng lại trong Unity
-  Editor.
-- Chưa có công cụ chung cho tranh vẽ sẵn chữ và cho thuộc tính component TMP
-  (độ rộng khung, tự co chữ); xem `docs/03-baked-art.md` và `docs/02-text-rendering.md`.
+- Chưa có công cụ chung cho tranh vẽ sẵn chữ; xem `docs/03-baked-art.md`.
+- `tmpfont.py add` chỉ nướng vào chỗ trống của atlas có sẵn; atlas đầy thì phải
+  dựng lại lớn hơn trong Unity Editor. Font nhiều atlas chưa hỗ trợ.
+- `tmp.py set` không đổi được việc game tự ngắt dòng trong code (UNLOGICAL cắt
+  tóm tắt chương ở 18 ký tự) — trường hợp đó cần bản vá `ips32.py`.
 - NSP bản cập nhật (RomFS dạng BKTR) chưa đọc được.
 
 ## Tài liệu

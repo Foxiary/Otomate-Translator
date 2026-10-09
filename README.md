@@ -5,7 +5,7 @@
 | engine | dành cho | công cụ |
 |---|---|---|
 | **Otomate** | game Otomate / Idea Factory: container CRI `.cpk`, kịch bản `STCM2L`, cơ sở dữ liệu `.gbin`/`.gstr`, font bitmap `.ffu` | 34, từ [VE-ES](https://github.com/Foxiary/VE-ES) |
-| **Unity** | game Unity IL2CPP: bundle và `.assets` (UnityPy), TextAsset JSON, font TextMeshPro, hằng chuỗi IL2CPP, bản vá IPS32 | 17, rút từ [ul-vi-patch](https://github.com/Foxiary/ul-vi-patch) |
+| **Unity** | game Unity IL2CPP: bundle và `.assets` (UnityPy), TextAsset JSON, khung chữ và font TextMeshPro (cả font tĩnh), hằng chuỗi IL2CPP, bản vá IPS32 | 22, rút từ [ul-vi-patch](https://github.com/Foxiary/ul-vi-patch) |
 
 Mỗi engine có workspace, giá trị biểu mẫu và tài liệu riêng; đổi engine không làm mất gì của engine kia. Giao diện cung cấp biểu mẫu, chọn tệp, nhật ký trực tiếp và nút dừng cho từng thao tác dòng lệnh.
 

@@ -8,8 +8,10 @@ Bảng dưới là bản tóm tắt.
 | `switchfs.py` | `exefs`, `romfs`, `nso` | Đọc NSP bằng `prod.keys`: ExeFS + `main.flat`, RomFS của game/DLC, giải nén NSO |
 | `unityls.py` | | Liệt kê object trong bundle / `.assets`, hoặc đếm theo loại (`--summary`) |
 | `textasset.py` | `dump`, `import`, `replace` | Xuất TextAsset ra `.txt`, nạp lại, hoặc thay một thuật ngữ có kiểm cấu trúc JSON |
-| `jsonsheet.py` | `export`, `apply` | Chuỗi trong TextAsset JSON ⇄ bảng XLSX `ID \| Source \| Translation` |
+| `jsonsheet.py` | `export`, `apply` | Chuỗi trong TextAsset JSON ⇄ bảng XLSX `ID \| Source \| Translation`; `--nested` mở cả JSON lồng trong chuỗi |
+| `tmp.py` | `list`, `set` | Khung chữ TextMeshPro: kích thước, vị trí, cỡ chữ, tự co, ngắt dòng, giãn chữ, lề |
 | `font.py` | `list`, `extract`, `replace`, `coverage` | Font nhúng: xem, trích TTF, thay TTF, kiểm ký tự thiếu |
+| `tmpfont.py` | `info`, `verify`, `add` | Font TextMeshPro tĩnh: nướng thêm glyph SDF vào atlas, không cần Unity Editor |
 | `il2cpp.py` | `find`, `patch` | Hằng chuỗi trong `global-metadata.dat`, vá tại chỗ |
 | `ips32.py` | | Bản vá mã máy IPS32 `<build id>.ips`, kiểm byte cũ với `main.flat` |
 | `release.py` | | Zip cho Ryujinx và Atmosphère, có DLC, bỏ `.resS` |
@@ -30,6 +32,17 @@ phát hành:
   hành có đổi cấu trúc, việc nằm ngoài sheet. `ScenarioData` (66 MB JSON) xuất
   trong khoảng 20 giây.
 - `il2cpp.py patch` cho `現在使用できません` đổi đúng 28 byte, trùng bản phát hành.
+- `jsonsheet.py --nested` trên `ScenarioData`: 64.853 dòng (lời thoại, tên người
+  nói, lựa chọn) xuất trong 7 giây, ghi lại 52.425 giá trị trong 10 giây; 528/529
+  lựa chọn và 78.972/79.606 lời thoại khớp bản phát hành — phần chênh đều là chuỗi
+  chỉ có dấu câu (`…………`), mặc định không xuất, cần `--all`.
+- `tmp.py set` lặp lại bản sửa khung backlog của UNLOGICAL (cao 50 → 213, tự co
+  28–39,5): component TMP và RectTransform giống bản phát hành **từng byte**. Trên
+  `sharedassets17.assets` (không có type tree) đọc và ghi được nhờ `--nodes-from`.
+- `tmpfont.py verify` với TTF gốc của `FOT-DNPShueiMGoStd-L SDF`: số đo của cả
+  7.125 glyph khớp trong 1/64 px, sai số pixel trung bình 1,86/255. Với font sai
+  (bản Bold, Arial) báo KHÔNG KHỚP. `add` nướng 102 chữ Việt từ Arial, không ô nào
+  chồng nhau, đọc lại khớp; ảnh xem trước đúng đường chân chữ. **Chưa thử trong game.**
 - `font.py replace` thay font điểm ảnh trong `ui_jp` (49 MB), font đọc lại giống
   từng byte; `coverage` báo font Nhật gốc thiếu 102/146 ký tự tiếng Việt.
 
