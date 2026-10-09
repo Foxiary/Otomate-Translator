@@ -15,7 +15,17 @@ const SOURCE_COMMIT = '5791cbd30adeaa5e74947a8fd4465a5d3c5460d5';
 const byId = new Map(tools.map(tool => [tool.id, tool]));
 
 function settingsPath() { return path.join(app.getPath('userData'), 'settings.json'); }
+// Until 1.2.1 the package was named ve-es-desktop, and Electron keys the user data
+// folder on the name. Copy the old settings once; the paths inside them still
+// point at the old folder, where the workspace and Python environment stay.
+function migrateSettings() {
+  const legacy = path.join(app.getPath('appData'), 've-es-desktop', 'settings.json');
+  if (fs.existsSync(settingsPath()) || !fs.existsSync(legacy)) return;
+  fs.mkdirSync(path.dirname(settingsPath()), {recursive: true});
+  fs.copyFileSync(legacy, settingsPath());
+}
 function loadSettings() {
+  try { migrateSettings(); } catch {}
   try { settings = JSON.parse(fs.readFileSync(settingsPath(), 'utf8')); }
   catch { settings = {}; }
   settings.workspace ||= path.join(app.getPath('userData'), 'workspace');
@@ -62,8 +72,8 @@ function performUpdateCheck() {
       settings.lastNotifiedUpdateCommit = result.latestCommit;
       saveSettings();
       if (app.isPackaged && Notification.isSupported()) {
-        const notice = new Notification({title: 'VE-ES Desktop: source update',
-          body: `New VE-ES code is available: ${result.latestCommit.slice(0, 7)}`});
+        const notice = new Notification({title: 'Otome Translator: engine update',
+          body: `New VE-ES engine code is available: ${result.latestCommit.slice(0, 7)}`});
         notice.on('click', () => {window?.show(); window?.focus();});
         notice.show();
       }
@@ -100,7 +110,7 @@ function makeArgs(tool, values) {
 function createWindow() {
   window = new BrowserWindow({
     width: 1450, height: 940, minWidth: 1050, minHeight: 690,
-    title: 'VE-ES Desktop', backgroundColor: '#11131b',
+    title: 'Otome Translator', backgroundColor: '#11131b',
     icon: path.resolve(__dirname, '..', 'assets', 'icon.png'),
     webPreferences: {preload: path.join(__dirname, 'preload.js'), contextIsolation: true,
       nodeIntegration: false, sandbox: true}
@@ -139,7 +149,7 @@ ipcMain.handle('open-update', () => {
   return shell.openExternal(lastUpdate.url);
 });
 ipcMain.handle('choose-workspace', async () => {
-  const result = await dialog.showOpenDialog(window, {title: 'Choose a VE-ES project folder',
+  const result = await dialog.showOpenDialog(window, {title: 'Choose a project folder',
     defaultPath: settings.workspace, properties: ['openDirectory', 'createDirectory']});
   if (result.canceled) return null;
   prepareWorkspace(result.filePaths[0]);

@@ -1,4 +1,4 @@
-# Otomate Translator
+# Otome Translator (OTM)
 
 Ứng dụng Electron cho bộ công cụ Việt hóa game Otomate / Idea Factory ([VE-ES](https://github.com/Foxiary/VE-ES)): container CRI `.cpk`, kịch bản `STCM2L`, cơ sở dữ liệu `.gbin`/`.gstr` và font bitmap `.ffu`. Giao diện cung cấp biểu mẫu, chọn tệp, nhật ký trực tiếp và nút dừng cho 34 thao tác dòng lệnh của bộ công cụ.
 
@@ -6,17 +6,19 @@
 
 ## Tải về
 
-Bản đóng gói nằm ở [Releases](https://github.com/Foxiary/Otomate-Translator/releases). Các gói chưa được ký số, nên Windows SmartScreen hoặc macOS Gatekeeper có thể cảnh báo.
+Bản đóng gói nằm ở [Releases](https://github.com/Foxiary/Otome-Translator/releases). Các gói chưa được ký số, nên Windows SmartScreen hoặc macOS Gatekeeper có thể cảnh báo.
 
 ## Chạy từ mã nguồn
 
 1. Cài Node.js và Python 3.
-2. Clone kèm submodule engine: `git clone --recursive https://github.com/Foxiary/Otomate-Translator.git`. Nếu đã clone rồi thì chạy `git submodule update --init`.
+2. Clone kèm submodule engine: `git clone --recursive https://github.com/Foxiary/Otome-Translator.git`. Nếu đã clone rồi thì chạy `git submodule update --init`.
 3. Trong thư mục repo, chạy `npm install` rồi `npm start`.
 4. Trong ứng dụng, chọn **Python environment → Set up Python packages** để tạo môi trường riêng và cài Pillow, fontTools, openpyxl, NumPy. Bạn cũng có thể chọn một Python đã cài các thư viện này.
 5. Chọn thư mục chứa dữ liệu dự án trong **Workspace**. Xem **Source documentation** để biết bố cục và quy trình dịch.
 
 Nếu npm chặn bước cài Electron, chạy `npm approve-scripts electron` và `node node_modules/electron/install.js` một lần.
+
+Đến bản 1.2.1 app có tên **VE-ES Desktop**. Lần đầu mở bản mới, app chép `settings.json` từ thư mục dữ liệu cũ (`%APPDATA%e-es-desktop` trên Windows) sang, nên workspace và môi trường Python cũ vẫn dùng được.
 
 ## Đóng gói
 

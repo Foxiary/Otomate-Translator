@@ -21,7 +21,7 @@ function latestFromResponse(items, bundledCommit) {
 function fetchLatest() {
   return new Promise((resolve, reject) => {
     const request = https.get(API_URL, {
-      headers: {'Accept': 'application/vnd.github+json', 'User-Agent': 'VE-ES-Desktop-Update-Check'}
+      headers: {'Accept': 'application/vnd.github+json', 'User-Agent': 'Otome-Translator-Update-Check'}
     }, response => {
       if (response.statusCode !== 200) {
         response.resume();

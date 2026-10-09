@@ -213,4 +213,4 @@ async function start() {
     window.vees.state().then(fresh=>{state.settings=fresh.settings;updatePython(fresh.python);}).catch(()=>{});
   });
 }
-start().catch(error=>{document.body.textContent=`Unable to start VE-ES Desktop: ${error.message}`;});
+start().catch(error=>{document.body.textContent=`Unable to start Otome Translator: ${error.message}`;});
