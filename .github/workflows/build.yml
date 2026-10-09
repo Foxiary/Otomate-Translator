@@ -1,0 +1,79 @@
+# Builds the installers from the tagged source. SignPath Foundation signs only
+# what a CI run built from the public repository, so releases come from here.
+#
+# Signing switches itself on once the repository has the SignPath settings:
+#   variable  SIGNPATH_ORGANIZATION_ID   (Settings > Secrets and variables > Actions > Variables)
+#   secret    SIGNPATH_API_TOKEN
+# Until then the unsigned installers are still built and uploaded as artifacts.
+name: Build
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npx electron-builder --win --x64 --publish never
+      - id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-unsigned
+          path: dist/OTM-*.exe
+          if-no-files-found: error
+      - name: Sign with SignPath
+        if: vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: otome-translator
+          signing-policy-slug: release-signing
+          github-artifact-id: ${{ steps.upload.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: dist/signed
+      - if: vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-signed
+          path: dist/signed
+          if-no-files-found: error
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      # No Apple Developer ID: the app is built unsigned, and Gatekeeper will
+      # ask users to open it from System Settings > Privacy & Security.
+      - run: npx electron-builder --mac --arm64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-unsigned
+          path: |
+            dist/*.dmg
+            dist/*.zip
+          if-no-files-found: error

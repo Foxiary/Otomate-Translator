@@ -15,6 +15,27 @@ Mỗi engine có workspace, giá trị biểu mẫu và tài liệu riêng; đ�
 
 Bản đóng gói nằm ở [Releases](https://github.com/Foxiary/Otome-Translator/releases). Các gói chưa được ký số, nên Windows SmartScreen hoặc macOS Gatekeeper có thể cảnh báo.
 
+Bản cài được build bằng GitHub Actions (`.github/workflows/build.yml`) từ đúng mã nguồn của tag phát hành.
+
+## Chính sách ký số
+
+Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
+
+- Người commit và duyệt mã: [Foxiary](https://github.com/Foxiary)
+- Người duyệt phát hành (approver): [Foxiary](https://github.com/Foxiary)
+
+Chỉ những bản build trên GitHub Actions từ mã nguồn công khai của repo này mới được gửi đi ký. Trong thời gian chờ SignPath duyệt dự án, bản cài vẫn **chưa được ký số**.
+
+## Quyền riêng tư
+
+Ứng dụng không gửi thông tin nào lên mạng, trừ ba trường hợp sau:
+
+- Khi mở app và mỗi ngày một lần, app hỏi API công khai của GitHub (`api.github.com/repos/Foxiary/VE-ES/commits`) xem commit mới nhất của VE-ES là gì. Yêu cầu này không kèm dữ liệu nào của người dùng.
+- Khi người dùng bấm **Set up Python packages**, `pip` tải thư viện từ PyPI.
+- Khi người dùng bấm **View changes**, trình duyệt mở trang commit trên GitHub.
+
+Workspace, bảng dịch và dữ liệu game chỉ nằm trên máy người dùng.
+
 ## Chạy từ mã nguồn
 
 1. Cài Node.js và Python 3.
@@ -55,3 +76,7 @@ Khi mở ứng dụng và mỗi ngày một lần, ứng dụng kiểm tra commi
 Mỗi thao tác chạy script Python gốc với danh sách tham số, không qua shell. Các giá trị lặp như `--font` và `--sheet` dùng mỗi dòng một giá trị. Đường dẫn tương đối được tính từ workspace đã chọn. Nhật ký hiển thị đầu ra; **Stop** dừng tiến trình đang chạy.
 
 Với engine Otomate, `build.py` dành riêng cho bố cục dự án Virche Evermore. Các công cụ khác nhận dữ liệu từ game Otomate khác như tài liệu nguồn mô tả; với `ffugen.py`, đổi game chỉ cần đổi `--template`. Biểu mẫu của `translate_glossary.py` ghi rõ các bản dịch mẫu có sẵn trong repo nguồn.
+
+## Giấy phép
+
+MIT — xem [LICENSE](LICENSE).

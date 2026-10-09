@@ -3,6 +3,9 @@
   "version": "1.4.0",
   "private": true,
   "description": "Otome Translator (OTM) - desktop app for translating Otomate / Idea Factory games",
+  "license": "MIT",
+  "author": "Trần Vũ Thuỳ Trang",
+  "repository": "github:Foxiary/Otome-Translator",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
